@@ -1,7 +1,7 @@
 import tensorflow as tf
 
 
-def se_block(residual, name='se_block', ratio=8):
+def se_block(residual, ratio=8):
     """Contains the implementation of Squeeze-and-Excitation(SE) block.
     As described in https://arxiv.org/abs/1709.01507.
     """
@@ -12,45 +12,40 @@ def se_block(residual, name='se_block', ratio=8):
     assert squeeze.get_shape()[1:] == (1, channel)
     excitation = tf.layers.dense(inputs=squeeze,
                                  units=channel // ratio,
-                                 activation=tf.nn.relu,
-                             )
+                                 activation=tf.nn.relu
+                                 )
     assert excitation.get_shape()[1:] == (1, channel // ratio)
     excitation = tf.layers.dense(inputs=excitation,
                                  units=channel,
-                                 activation=tf.nn.sigmoid,
+                                 activation=tf.nn.sigmoid
                                  )
     assert excitation.get_shape()[1:] == (1, channel)
-    # top = tf.multiply(bottom, se, name='scale')
     scale = residual * excitation
     return scale
 
 
-def cbam_block(input_feature, name='cbam_block', ratio=8):
+def cbam_block(input_feature, ratio=8):
     """Contains the implementation of Convolutional Block Attention Module(CBAM) block.
     As described in https://arxiv.org/abs/1807.06521.
     """
-
-    attention_feature = channel_attention(input_feature, 'ch_at', ratio)
-    attention_feature = spatial_attention(attention_feature, 'sp_at')
-    print("CBAM Hello")
+    attention_feature = channel_attention(input_feature, ratio)
+    attention_feature = spatial_attention(attention_feature)
     return attention_feature
 
 
-def channel_attention(input_feature, name, ratio=8):
-
+def channel_attention(input_feature, ratio=8):
     channel = input_feature.get_shape()[-1]
     avg_pool = tf.reduce_mean(input_feature, axis=[1], keepdims=True)
 
     assert avg_pool.get_shape()[1:] == (1, channel)
     avg_pool = tf.layers.dense(inputs=avg_pool,
                                units=channel // ratio,
-                               activation=tf.nn.relu,
-                               reuse=True)
+                               activation=tf.nn.relu
+                               )
     assert avg_pool.get_shape()[1:] == (1, channel // ratio)
     avg_pool = tf.layers.dense(inputs=avg_pool,
                                units=channel,
-                                name='mlp_1',
-                               reuse=True)
+                               )
     assert avg_pool.get_shape()[1:] == (1, channel)
 
     max_pool = tf.reduce_max(input_feature, axis=[1], keepdims=True)
@@ -71,7 +66,7 @@ def channel_attention(input_feature, name, ratio=8):
     return input_feature * scale
 
 
-def spatial_attention(input_feature, name):
+def spatial_attention(input_feature):
     kernel_size = 13
 
     avg_pool = tf.reduce_mean(input_feature, axis=[2], keepdims=True)
