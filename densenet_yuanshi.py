@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import tensorflow as tf
 
 
@@ -48,7 +49,7 @@ def Dense_net(x,growthRate=24,kernel_size=3,keep_prob_=0.5):
     ######### CNNs with large filter size at the first layer #########
 
     # Convolution
-    network = tf.layers.conv1d(inputs=input_var, filters=64, kernel_size=400, strides=50,
+    network = tf.layers.conv1d(inputs=x, filters=64, kernel_size=400, strides=50,
                                padding='same', activation=tf.nn.relu)
 
     network = tf.layers.max_pooling1d(inputs=network, pool_size=4, strides=4, padding='same')

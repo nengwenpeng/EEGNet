@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import tensorflow as tf
 
 
@@ -35,33 +36,33 @@ def head_cnn(x,keep_prob_=0.8):
     # 64
     return network
 
-def Dense_block(x,in_cha,growthRate=12,kernel_size=3):
+def Dense_block(x,growthRate=12,kernel_size=3):
     network = Bottleneck(x, growthRate, kernel_size)
-    network = Bottleneck(network, growthRate*1+in_cha, kernel_size)
-    network = Bottleneck(network, growthRate*2+in_cha, kernel_size)
-    network = Bottleneck(network, growthRate*3+in_cha, kernel_size)
+    network = Bottleneck(network, growthRate, kernel_size)
+    network = Bottleneck(network, growthRate, kernel_size)
+    network = Bottleneck(network, growthRate, kernel_size)
     return network
 
 
 def Dense_net(x,growthRate=24,kernel_size=3,keep_prob_=0.5):
     network = head_cnn(x, keep_prob_)
     # 64
-    in_cha = 128
-    network = Dense_block(network, in_cha, growthRate, kernel_size)
+
+    network = Dense_block(network,growthRate, kernel_size)
     out_cha = 128
     network = Pool_block(network,out_cha, keep_prob_)
     # 32
-    in_cha = out_cha
-    network = Dense_block(network, in_cha, growthRate, kernel_size)
+
+    network = Dense_block(network,growthRate, kernel_size)
     out_cha = 128
     network = Pool_block(network,out_cha,keep_prob_)
     # 16
-    in_cha = out_cha
-    network = Dense_block(network, in_cha, growthRate, kernel_size)
+
+    network = Dense_block(network,growthRate, kernel_size)
     out_cha = 128
     network = Pool_block(network,out_cha,keep_prob_)
     # 8
-    network = Dense_block(network, in_cha, growthRate, kernel_size)
+    network = Dense_block(network,growthRate, kernel_size)
 
     network = tf.layers.average_pooling1d(inputs=network, pool_size=8, strides=8, padding='same')
 

@@ -11,27 +11,24 @@ def Bottleneck(x,growthRate,kernel_size):
     return network
 
 
-def Pool_block(x,out_cha,keep_prob_=0.8):
+def Pool_block(x):
     network = tf.layers.batch_normalization(inputs=x)
     network = tf.nn.relu(network)
-    network = tf.layers.conv1d(inputs=network, filters=out_cha, kernel_size=1, strides=1,
-                               padding='same', activation=tf.nn.relu, use_bias=False)
     network = tf.layers.average_pooling1d(inputs=network, pool_size=2, strides=2, padding='same')
-    network = tf.nn.dropout(network, keep_prob_)
     return network
 
-def head_cnn(x,keep_prob_=0.8):
+
+def head_cnn(x):
     network = tf.layers.conv1d(inputs=x, filters=64, kernel_size=50, strides=6,
                                padding='same', activation=None, use_bias=False)
     network = tf.layers.batch_normalization(inputs=network)
     network = tf.nn.relu(network)
     # 500
     network = tf.layers.max_pooling1d(inputs=network, pool_size=2, strides=2, padding='same')
-    network = tf.nn.dropout(network, keep_prob_)
     # 250
     return network
 
-def Dense_block(x,growthRate=12,kernel_size=3):
+def Dense_block(x,growthRate=12,kernel_size=8):
     network = Bottleneck(x, growthRate, kernel_size)
     network = Bottleneck(network, growthRate, kernel_size)
     network = Bottleneck(network, growthRate, kernel_size)
@@ -40,28 +37,24 @@ def Dense_block(x,growthRate=12,kernel_size=3):
 
 
 def Dense_net(x,growthRate=12,kernel_size=3,keep_prob_=0.5):
-    keep_prob_ = 0.8
-    network = head_cnn(x, keep_prob_)
+    network = head_cnn(x)
+
     # 250
-
     network = Dense_block(network,growthRate, kernel_size)
-    out_cha = 192
-    network = Pool_block(network,out_cha, keep_prob_)
+    network = Pool_block(network)
+
     # 125
-
     network = Dense_block(network,growthRate, kernel_size)
-    out_cha = 256
-    network = Pool_block(network,out_cha, keep_prob_)
+    network = Pool_block(network)
+
     # 64
-
     network = Dense_block(network,growthRate, kernel_size)
-    out_cha = 384
-    network = Pool_block(network,out_cha, keep_prob_)
+    network = Pool_block(network)
+
     # 32
-
     network = Dense_block(network,growthRate, kernel_size)
-    out_cha = 512
-    network = Pool_block(network,out_cha,keep_prob_)
+    network = Pool_block(network)
+
     # 16
     network = Dense_block(network,growthRate, kernel_size)
 
