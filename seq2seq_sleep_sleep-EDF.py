@@ -25,10 +25,6 @@ from dense_gru import Dense_GRU
 from cbam1d import se_block, cbam_block
 import argparse
 
-
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
-
-
 def data_stft(data): # B,seq_length,3000
     assert data.ndim == 3 and data.shape[-1] == 3000
     seq_length = data.shape[1]
@@ -42,11 +38,10 @@ def batch_data(x, y, batch_size):
     shuffle = np.random.permutation(len(x))
     start = 0
 #     from IPython.core.debugger import Tracer; Tracer()()
-    xt = x[shuffle]
-    xf = data_stft(xt)
+    x = x[shuffle]
     y = y[shuffle]
     while start + batch_size <= len(x):
-        yield xt[start:start+batch_size], xf[start:start+batch_size],y[start:start+batch_size]
+        yield x[start:start+batch_size], y[start:start+batch_size]
         start += batch_size
 
 def flatten(name, input_var):
@@ -61,15 +56,21 @@ def flatten(name, input_var):
     return output_var
 
 
-def build_firstPart_model(input_var_t,input_var_f,keep_prob_=0.5):
+def build_firstPart_model(input_var,keep_prob_=0.5):
+
     output_conns = []
-    network = Dense_net(input_var_t, growthRate=12, kernel_size=3, keep_prob_=0.8)
-    network = flatten('dense_cnn',network)
+    network = Dense_net(input_var, growthRate=12, kernel_size=3, keep_prob_=0.8)
+    network = flatten('test',network)
     output_conns.append(network)
-    network = Dense_GRU(input_var_f,output_dim=64)
-    network = flatten('dense_gru',network)
+
+    network = Dense_GRU(input_var, growthRate=12, kernel_size=3, keep_prob_=0.8)
+    network = flatten('test', network)
+
     output_conns.append(network)
-    network = tf.concat(output_conns, 1)
+    network = tf.concat(output_conns, 1, name="concat1")
+
+    # Dropout
+    # network = tf.nn.dropout(network, keep_prob_)
     return network
 
 
@@ -113,16 +114,15 @@ def plot_attention(attention_map, input_tags = None, output_tags = None):
     plt.show()
 
 
-def build_network(hparams,char2numY,inputs_t,inputs_f,dec_inputs,keep_prob_=0.5,):
+def build_network(hparams,char2numY,inputs,dec_inputs,keep_prob_=0.5,):
         #  超参数、   、输入、  、 dropout保留率
     if hparams.akara2017 is True:
-        _inputs_t = tf.reshape(inputs_t, [-1, hparams.input_depth,1])   # 3000,1
-        _inputs_f = tf.reshape(inputs_f, [-1, 25,129])   # 3000,1
-        network = build_firstPart_model(_inputs_t,_inputs_f, keep_prob_)
+        _inputs = tf.reshape(inputs, [-1, hparams.input_depth,1])   # 3000,1
+        network = build_firstPart_model(_inputs, keep_prob_)
         shape = network.get_shape().as_list()
         data_input_embed = tf.reshape(network, (-1, hparams.max_time_step, shape[1]))  # 10，3000
     else:
-        _inputs = tf.reshape(inputs_t, [-1, hparams.n_channels, hparams.input_depth / hparams.n_channels])
+        _inputs = tf.reshape(inputs, [-1, hparams.n_channels, hparams.input_depth / hparams.n_channels])
 
         conv1 = tf.layers.conv1d(inputs=_inputs, filters=32, kernel_size=2, strides=1,
                                  padding='same', activation=tf.nn.relu)
@@ -351,10 +351,10 @@ random.seed(654) # to make have the same training set and test set each time the
 
 
 
-def build_whole_model(hparams,char2numY,inputs_t,inputs_f, targets,dec_inputs, keep_prob_):
+def build_whole_model(hparams,char2numY,inputs, targets,dec_inputs, keep_prob_):
     # logits = build_network(inputs,dec_inputs=dec_inputs)
     # 建立整体的模型
-    logits, pred_outputs,dec_states = build_network(hparams,char2numY,inputs_t,inputs_f, dec_inputs, keep_prob_)
+    logits, pred_outputs,dec_states = build_network(hparams,char2numY,inputs, dec_inputs, keep_prob_)
     decoder_prediction = tf.argmax(logits, 2)
 
     # optimization operation
@@ -411,15 +411,15 @@ def run_program(hparams,FLAGS):
         y_true = []
         y_pred = []
         alignments_alphas_all = []  # (batch_num,B,max_time_step,max_time_step)
-        for batch_i, (source_batch_t, source_batch_f,target_batch) in enumerate(batch_data(X_test, y_test, hparams.batch_size)):
+        for batch_i, (source_batch, target_batch) in enumerate(batch_data(X_test, y_test, hparams.batch_size)):
             # if source_batch.shape[1] != hparams.max_time_step:
             #     print ("Num of steps is: ", source_batch.shape[1])
             # try:
             pred_outputs_ = sess.run(pred_outputs,
-                                     feed_dict={inputs_t: source_batch_t,inputs_f: source_batch_f, keep_prob_: 1.0})
+                                     feed_dict={inputs: source_batch, keep_prob_: 1.0})
 
             alignments_alphas = sess.run(dec_states.alignment_history.stack(),
-                                         feed_dict={inputs_t: source_batch_t,inputs_f: source_batch_f, dec_inputs: target_batch[:, :-1],
+                                         feed_dict={inputs: source_batch, dec_inputs: target_batch[:, :-1],
                                                     keep_prob_: 1.0})
 
             # acc_track.append(np.mean(dec_input == target_batch))
@@ -573,14 +573,13 @@ def run_program(hparams,FLAGS):
         with tf.Graph().as_default(), tf.Session() as sess:
 
             # Placeholders
-            inputs_t = tf.placeholder(tf.float32, [None, hparams.max_time_step, hparams.input_depth], name='inputs_t')
-            inputs_f = tf.placeholder(tf.float32, [None, hparams.max_time_step, 25,129], name='inputs_f')
+            inputs = tf.placeholder(tf.float32, [None, hparams.max_time_step, hparams.input_depth], name='inputs')
             targets = tf.placeholder(tf.int32, (None, None), 'targets')
             dec_inputs = tf.placeholder(tf.int32, (None, None), 'decoder_inputs')
             keep_prob_ = tf.placeholder(tf.float32, name='keep')
 
             # model
-            logits, pred_outputs, loss, optimizer,dec_states = build_whole_model(hparams,char2numY,inputs_t,inputs_f,targets, dec_inputs, keep_prob_)
+            logits, pred_outputs, loss, optimizer,dec_states = build_whole_model(hparams,char2numY,inputs,targets, dec_inputs, keep_prob_)
             count_prameters()
             sess.run(tf.global_variables_initializer())
             sess.run(tf.local_variables_initializer())
@@ -615,7 +614,7 @@ def run_program(hparams,FLAGS):
                     # train_acc = []
                     y_true = []
                     y_pred  =[]
-                    for batch_i, (source_batch_t,source_batch_f, target_batch) in enumerate(batch_data(X_train, y_train, hparams.batch_size)):
+                    for batch_i, (source_batch, target_batch) in enumerate(batch_data(X_train, y_train, hparams.batch_size)):
 
                         # _, batch_loss, batch_logits, alignments_alphas = sess.run([optimizer, loss, logits,dec_states.alignment_history.stack()],
                         #     feed_dict = {inputs: source_batch,
@@ -624,7 +623,7 @@ def run_program(hparams,FLAGS):
                         #                                        )
 
                         _, batch_loss, batch_logits = sess.run([optimizer, loss, logits],
-                            feed_dict = {inputs_t: source_batch_t,inputs_f: source_batch_f,
+                            feed_dict = {inputs: source_batch,
                                          dec_inputs: target_batch[:, :-1],
                                          targets: target_batch[:, 1:],keep_prob_: 0.5} #,
                                                                )

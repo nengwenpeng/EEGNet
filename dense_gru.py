@@ -1,12 +1,12 @@
 import tensorflow as tf
 
 
-def Bi_GRU(x, output_dim,attention_size=32):
+def Bi_GRU(x, output_dim, attention_size=32):
     gruCell_fw = tf.nn.rnn_cell.GRUCell(output_dim)
     gruCell_bw = tf.nn.rnn_cell.GRUCell(output_dim)
 
     attention_mechanism = tf.contrib.seq2seq.LuongAttention(
-        output_dim,x, memory_sequence_length=None)
+        output_dim, x, memory_sequence_length=None)
 
     gruCell_fw = tf.contrib.seq2seq.AttentionWrapper(
         gruCell_fw, attention_mechanism,
@@ -28,9 +28,14 @@ def Bi_GRU(x, output_dim,attention_size=32):
 
 
 def Dense_GRU(x, output_dim=64):
+    stfts = tf.contrib.signal.stft(x,
+                                   frame_length=200,
+                                   frame_step=100,
+                                   fft_length=256)
+    # B,29,129
     with tf.variable_scope('gru_1'):
-        output = Bi_GRU(x, output_dim)
+        output = Bi_GRU(stfts, output_dim)
     with tf.variable_scope('gru_2'):
-        outputs = tf.concat((output, x), 2)
+        outputs = tf.concat((output, stfts), 2)
         outputs = Bi_GRU(outputs, output_dim)
     return outputs[:, -1, :]
