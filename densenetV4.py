@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import tensorflow as tf
-
+from cbam1d import se_block, cbam_block
 
 def Bottleneck(x,growthRate,kernel_size):
     network = tf.layers.batch_normalization(inputs=x)
@@ -28,7 +28,7 @@ def head_cnn(x):
     # 250
     return network
 
-def Dense_block(x,growthRate=12,kernel_size=8):
+def Dense_block(x,growthRate,kernel_size):
     network = Bottleneck(x, growthRate, kernel_size)
     network = Bottleneck(network, growthRate, kernel_size)
     network = Bottleneck(network, growthRate, kernel_size)
@@ -36,7 +36,7 @@ def Dense_block(x,growthRate=12,kernel_size=8):
     return network
 
 
-def Dense_net(x,growthRate=12,kernel_size=3,keep_prob_=0.5):
+def Dense_net(x,growthRate=12,kernel_size=8,keep_prob_=0.5):
     network = head_cnn(x)
 
     # 250
